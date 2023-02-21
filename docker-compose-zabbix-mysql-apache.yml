@@ -1,0 +1,137 @@
+version: '3.5'
+
+networks:
+  default:
+    name: web_net
+
+volumes:
+  traefik-acme:
+    name: traefik-acme
+  nginx-data:
+    name: nginx-data
+
+services:
+  traefik:
+    image: traefik
+    container_name: treafik 
+    command:
+      - "--log.level=INFO"
+      - "--log.filepath=/log-file.log"
+      - "--log.format=json"
+      - "--api=true"
+      - "--ping=true"
+      - "--accesslog=true"
+      - "--accesslog.bufferingsize=100"
+      - "--api.insecure=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=web_net"
+      - "--entrypoints.http.address=:80"
+      - "--entrypoints.https.address=:443"
+
+      - "--certificatesresolvers.mycert.acme.email=hutan.alinaghi88@gmail.com"
+      - "--certificatesresolvers.mycert.acme.storage=/acme/acme.json"
+      - "--certificatesresolvers.mycert.acme.tlschallenge=true"
+
+      - "--providers.file.filename=/traefik/config.yml"
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-acme:/acme
+      - ./traefik:/traefik
+    networks:
+      - default
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.traefik.entrypoints=http"
+      - "traefik.http.routers.traefik.rule=Host(`tr.home.com`)"
+      - "traefik.http.routers.traefik.middlewares=https-redirect"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.web-auth.basicauth.users=user:$$apr1$$QpkypDvQ$$FjJgBGyX/By8agkOCUvDo."
+      - "traefik.http.routers.traefik-secure.middlewares=web-auth"
+      - "traefik.http.routers.traefik-secure.entrypoints=https"
+      - "traefik.http.routers.traefik-secure.rule=Host(`tr.home.com`)"
+      - "traefik.http.routers.traefik-secure.tls=true"
+      - "traefik.http.routers.traefik-secure.tls.options=default"
+      - "traefik.http.routers.traefik-secure.tls.certresolver=mycert"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+
+        #  nginx:
+        #    image: nginx
+        #    container_name: webserver
+        #    restart: unless-stopped
+        #    networks:
+        #      - default
+        #    labels:
+        #      - "traefik.enable=true"
+        #      - "traefik.docker.network=web_net"
+        #      - "traefik.http.routers.nginx.entrypoints=http"
+        #      - "traefik.http.routers.nginx.rule=Host(`web.home.com`)"
+        #      - "traefik.http.routers.nginx.service=nginx-secure"
+        #      - "traefik.http.routers.nginx.middlewares=https-redirect"
+        #      - "traefik.http.routers.nginx-secure.entrypoints=https"
+        #      - "traefik.http.routers.nginx-secure.rule=Host(`web.home.com`)"
+        #      - "traefik.http.routers.nginx-secure.tls=true"
+        #      - "traefik.http.routers.nginx-secure.tls.options=default"
+        #      - "traefik.http.routers.nginx-secure.tls.certresolver=mycert"
+        #      - "traefik.http.services.nginx-secure.loadbalancer.server.port=80"
+
+
+  mysql:
+    image: mysql
+    container_name: db_mysql
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - default
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+
+  zabbix:
+    image: zabbix/zabbix-server-mysql
+    container_name: zabbix_server
+    restart: unless-stopped
+    ports:
+      - 10051:10051
+    networks:
+      - default
+    environment:
+      - DB_SERVER_HOST=db_mysql
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=password
+
+  apache:
+    image: zabbix/zabbix-web-apache-mysql
+    container_name: zabbix-web01
+    restart: unless-stopped
+    networks:
+      - default
+    environment:
+      - DB_SERVER_HOST=db_mysql
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=password
+      - ZBX_SERVER_HOST=zabbix_server
+      - PHP_TZ=Asia/Tehran
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web_net"
+      - "traefik.http.routers.apache.entrypoints=http"
+      - "traefik.http.routers.apache.rule=Host(`monitor.home.com`)"
+        #      - "traefik.http.routers.apache.service=apache-route"
+      - "traefik.http.services.apache.loadbalancer.server.port=8080"
+        #   - "traefik.http.routers.nginx.middlewares=https-redirect"
+        #   - "traefik.http.routers.nginx-secure.entrypoints=https"
+        #   - "traefik.http.routers.apache-secure.rule=Host(`monitor.home.com`)"
+        #   - "traefik.http.routers.nginx-secure.tls=true"
+        #   - "traefik.http.routers.nginx-secure.tls.options=default"
+        #   - "traefik.http.routers.apache-secure.tls.certresolver=mycert"
+        #   - "traefik.http.services.apache-secure.loadbalancer.server.port=8080"
+ 
