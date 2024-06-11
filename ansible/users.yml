@@ -1,0 +1,44 @@
+---
+- name: Create users with sudo access
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure sudo is installed
+      package:
+        name: sudo
+        state: present
+
+    - name: Create user1 with initial password
+      user:
+        name: user1
+        password: "{{ '1' | password_hash('sha512') }}"
+        state: present
+        shell: /bin/bash
+
+    - name: Create user2 with initial password
+      user:
+        name: user2
+        password: "{{ '1' | password_hash('sha512') }}"
+        state: present
+        shell: /bin/bash
+
+    - name: Set user1 password change on first login
+      command: chage -d 0 user1
+
+    - name: Set user2 password change on first login
+      command: chage -d 0 user2
+
+    - name: Add user1 to sudoers
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        line: 'user1 ALL=(ALL) NOPASSWD:ALL'
+        validate: 'visudo -cf %s'
+
+    - name: Add user2 to sudoers
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        line: 'user2 ALL=(ALL) NOPASSWD:ALL'
+        validate: 'visudo -cf %s'
+
