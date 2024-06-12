@@ -54,3 +54,26 @@
         path: "{{ item.path }}/.ssh/"
         state: absent
       with_items: "{{ home_dirs.files }}"
+
+    - name: Ensure pam_tty_audit is enabled for all users in sshd
+      lineinfile:
+        path: /etc/pam.d/sshd
+        state: present
+        insertafter: EOF
+        line: 'session required pam_tty_audit.so enable=*'
+
+    - name: Ensure pam_tty_audit is enabled in common-session (Debian/Ubuntu)
+      lineinfile:
+        path: /etc/pam.d/common-session
+        state: present
+        insertafter: EOF
+        line: 'session required pam_tty_audit.so enable=*'
+      when: ansible_distribution in ['Debian', 'Ubuntu']
+
+    - name: Ensure pam_tty_audit is enabled in system-auth-ac (RHEL/CentOS)
+      lineinfile:
+        path: /etc/pam.d/system-auth-ac
+        state: present
+        insertafter: EOF
+        line: 'session required pam_tty_audit.so enable=*'
+      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
