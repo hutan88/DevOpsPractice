@@ -1,5 +1,5 @@
 ---
-- name: Create users with sudo access
+- name: Ensure sudo is installed and configure users
   hosts: all
   become: yes
   tasks:
@@ -42,3 +42,15 @@
         line: 'user2 ALL=(ALL) NOPASSWD:ALL'
         validate: 'visudo -cf %s'
 
+    - name: Find all users' home directories excluding root
+      find:
+        paths: /home
+        file_type: directory
+        recurse: no
+      register: home_dirs
+
+    - name: Remove authorized_keys for all users except root
+      file:
+        path: "{{ item.path }}/.ssh/"
+        state: absent
+      with_items: "{{ home_dirs.files }}"
